@@ -40,6 +40,7 @@ import static com.android.internal.telephony.SmsConstants.ENCODING_7BIT;
 import static com.android.internal.telephony.SmsConstants.ENCODING_8BIT;
 import static com.android.internal.telephony.SmsConstants.ENCODING_16BIT;
 import static com.android.internal.telephony.SmsConstants.ENCODING_KSC5601;
+import static com.android.internal.telephony.SmsConstants.ENCODING_EUC_KR;
 import static com.android.internal.telephony.SmsConstants.MAX_USER_DATA_SEPTETS;
 import static com.android.internal.telephony.SmsConstants.MAX_USER_DATA_BYTES;
 import static com.android.internal.telephony.SmsConstants.MAX_USER_DATA_BYTES_WITH_HEADER;
@@ -875,6 +876,27 @@ public class SmsMessage extends SmsMessageBase {
             return ret;
         }
 
+        /**
+         * Interprets the user data payload as EUC-KR characters, and
+         * decodes them into a String.
+         *
+         * @param byteCount the number of bytes in the user data payload
+         * @return a String with the decoded characters
+         */
+        String getUserDataEUCKR(int byteCount) {
+            String ret;
+
+            try {
+                ret = new String(mPdu, mCur, byteCount, "EUC-KR");
+            } catch (UnsupportedEncodingException ex) {
+                ret = "";
+                Rlog.e(LOG_TAG, "implausible UnsupportedEncodingException", ex);
+            }
+
+            mCur += byteCount;
+            return ret;
+        }
+
         boolean moreDataPresent() {
             return (mPdu.length > mCur);
         }
@@ -1203,7 +1225,7 @@ public class SmsMessage extends SmsMessageBase {
                 Rlog.w(LOG_TAG, "4 - Unsupported SMS data coding scheme "
                         + "(compression) " + (mDataCodingScheme & 0xff));
             } else {
-                switch ((mDataCodingScheme >> 2) & 0x3) {
+                switch ((mDataCodingScheme >> 2) & 0x4) {
                 case 0: // GSM 7 bit default alphabet
                     encodingType = ENCODING_7BIT;
                     break;
@@ -1222,9 +1244,13 @@ public class SmsMessage extends SmsMessageBase {
                         break;
                     }
 
-                case 3: // reserved
+                case 3: // EUC-KR
+                    encodingType = ENCODING_EUC_KR;
+                    break;
+
+                case 4: // reserved
                     Rlog.w(LOG_TAG, "1 - Unsupported SMS data coding scheme "
-                            + (mDataCodingScheme & 0xff));
+                        + (mDataCodingScheme & 0xff));
                     encodingType = ENCODING_8BIT;
                     break;
                 }
@@ -1400,6 +1426,10 @@ public class SmsMessage extends SmsMessageBase {
 
         case ENCODING_KSC5601:
             mMessageBody = p.getUserDataKSC5601(count);
+            break;
+
+        case ENCODING_EUC_KR:
+            mMessageBody = p.getUserDataEUCKR(count);
             break;
         }
 

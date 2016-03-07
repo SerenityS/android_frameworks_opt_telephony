@@ -441,7 +441,13 @@ public class PduPersister {
                             || ContentType.TEXT_HTML.equals(type)) {
                         String text = c.getString(PART_COLUMN_TEXT);
                         // we will use default encoding when charset is null or not supported
-                        byte [] blob = getBlob(getCharsetName(charset) != null, charset, text);
+                        byte [] blob;
+                        try {
+                            blob = (text != null ? text : "").getBytes(CharacterSets.getMimeName(charset));
+                        } catch (Exception e) {
+                            Log.w(TAG, "Failed to decode an MMS text.", e);
+                            blob = new EncodedStringValue(text != null ? text : "").getTextString();
+                        }
                         baos.write(blob, 0, blob.length);
                     } else {
 
@@ -833,7 +839,7 @@ public class PduPersister {
                 ContentValues cv = new ContentValues();
                 if (data == null) {
                     data = new String("").getBytes(CharacterSets.DEFAULT_CHARSET_NAME);
-                    cv.put(Telephony.Mms.Part.TEXT, new EncodedStringValue(data).getString());
+                    cv.put(Telephony.Mms.Part.TEXT, new EncodedStringValue(part.getCharset(), data).getString());
                     Log.w(TAG, "Part data is null. contentType: " + contentType);
                 } else {
                     // we will use default encoding when charset is 0 or not supported
